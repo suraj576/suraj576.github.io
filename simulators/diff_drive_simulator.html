@@ -7,63 +7,62 @@
 <style>
 
 body{
-    font-family: system-ui, -apple-system, Segoe UI, Roboto;
-    background:#f4f6f8;
-    margin:0;
-    text-align:center;
+font-family: system-ui,Segoe UI,Roboto;
+background:#f4f6f8;
+margin:0;
+text-align:center;
 }
 
 .header{
-    background:white;
-    padding:20px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.1);
+background:white;
+padding:18px;
+box-shadow:0 2px 10px rgba(0,0,0,0.1);
 }
 
 .container{
-    display:flex;
-    justify-content:center;
-    gap:30px;
-    margin-top:30px;
-    flex-wrap:wrap;
-}
-
-.panel{
-    background:white;
-    padding:20px;
-    border-radius:12px;
-    box-shadow:0 4px 12px rgba(0,0,0,0.1);
-    width:320px;
+display:flex;
+justify-content:center;
+gap:30px;
+margin-top:25px;
+flex-wrap:wrap;
 }
 
 canvas{
-    background:white;
-    border-radius:12px;
-    box-shadow:0 4px 12px rgba(0,0,0,0.1);
+background:white;
+border-radius:10px;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+
+.panel{
+background:white;
+padding:20px;
+border-radius:10px;
+width:300px;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
 }
 
 input[type=range]{
-    width:100%;
+width:100%;
 }
 
 button{
-    margin:5px;
-    padding:10px 16px;
-    border:none;
-    border-radius:6px;
-    background:#2c7be5;
-    color:white;
-    font-size:14px;
-    cursor:pointer;
+padding:9px 14px;
+margin:4px;
+border:none;
+border-radius:6px;
+background:#2c7be5;
+color:white;
+cursor:pointer;
 }
 
 button:hover{
-    background:#1a68d1;
+background:#1a68d1;
 }
 
 .info{
-    text-align:left;
-    font-size:14px;
-    margin-top:15px;
+text-align:left;
+font-size:14px;
+margin-top:15px;
 }
 
 </style>
@@ -77,23 +76,23 @@ button:hover{
 
 <div class="container">
 
-<canvas id="simCanvas" width="700" height="500"></canvas>
+<canvas id="canvas" width="700" height="500"></canvas>
 
 <div class="panel">
 
 <label>Left Wheel Speed (rad/s)</label>
-<input type="range" id="leftWheel" min="-10" max="10" step="0.1" value="2">
-<div id="leftVal">2</div>
+<input type="range" id="wl" min="-10" max="10" step="0.1" value="2">
+<div id="wlVal">2</div>
 
 <br>
 
 <label>Right Wheel Speed (rad/s)</label>
-<input type="range" id="rightWheel" min="-10" max="10" step="0.1" value="2">
-<div id="rightVal">2</div>
+<input type="range" id="wr" min="-10" max="10" step="0.1" value="2">
+<div id="wrVal">2</div>
 
 <br>
 
-<label>Simulation Time (seconds)</label>
+<label>Simulation Time (s)</label>
 <input type="number" id="timeLimit" value="10">
 
 <br><br>
@@ -105,15 +104,15 @@ button:hover{
 
 <div class="info">
 
-<p><b>Time:</b> <span id="time">0</span> s</p>
-<p><b>Position:</b> (<span id="xpos">0</span>, <span id="ypos">0</span>)</p>
+<p><b>Time:</b> <span id="time">0</span></p>
+<p><b>Position:</b> (<span id="x">0</span>, <span id="y">0</span>)</p>
 <p><b>Orientation:</b> <span id="theta">0</span> rad</p>
 
 <hr>
 
-<p><b>Linear Velocity v:</b> <span id="vval">0</span> m/s</p>
-<p><b>Angular Velocity ω:</b> <span id="wval">0</span> rad/s</p>
-<p><b>Radius of Curvature R:</b> <span id="rval">∞</span> m</p>
+<p><b>v:</b> <span id="v">0</span></p>
+<p><b>ω:</b> <span id="w">0</span></p>
+<p><b>R:</b> <span id="R">∞</span></p>
 
 </div>
 
@@ -123,169 +122,209 @@ button:hover{
 
 <script>
 
-const canvas = document.getElementById("simCanvas");
-const ctx = canvas.getContext("2d");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
 
-let x = 350;
-let y = 250;
-let theta = 0;
+const width=canvas.width;
+const height=canvas.height;
 
-let time = 0;
-let dt = 0.05;
+const originX=width/2;
+const originY=height/2;
 
-const r = 10;
-const L = 40;
+let x=0;
+let y=0;
+let theta=0;
 
-let path = [];
+let dt=0.02;
+let time=0;
+
+const r=0.1;
+const L=0.5;
+
+const scale=80;
 
 let running=false;
 let paused=false;
 let timeLimit=10;
 
-const leftSlider=document.getElementById("leftWheel");
-const rightSlider=document.getElementById("rightWheel");
+let path=[];
 
-leftSlider.oninput=()=>document.getElementById("leftVal").innerText=leftSlider.value;
-rightSlider.oninput=()=>document.getElementById("rightVal").innerText=rightSlider.value;
+const wlSlider=document.getElementById("wl");
+const wrSlider=document.getElementById("wr");
+
+wlSlider.oninput=()=>document.getElementById("wlVal").innerText=wlSlider.value;
+wrSlider.oninput=()=>document.getElementById("wrVal").innerText=wrSlider.value;
 
 function startSim(){
-
-    timeLimit = parseFloat(document.getElementById("timeLimit").value);
-
-    if(time >= timeLimit){
-        time = 0;
-        path = [];
-    }
-
-    running = true;
-    paused = false;
-
+timeLimit=parseFloat(document.getElementById("timeLimit").value);
+running=true;
+paused=false;
 }
 
 function pauseSim(){
-
-    paused=!paused;
-
+paused=!paused;
 }
 
 function stopSim(){
-
-    running=false;
-    paused=false;
-
+running=false;
+paused=false;
 }
 
 function resetSim(){
 
-    running=false;
-    paused=false;
+running=false;
+paused=false;
 
-    x=350;
-    y=250;
-    theta=0;
+x=0;
+y=0;
+theta=0;
+time=0;
 
-    time=0;
+path=[];
 
-    path=[];
-
-    updateDisplay(0,0);
+updateDisplay(0,0);
 
 }
 
-function updateDisplay(v,omega){
+function updateDisplay(v,w){
 
-    document.getElementById("time").innerText=time.toFixed(2);
-    document.getElementById("xpos").innerText=(x-350).toFixed(2);
-    document.getElementById("ypos").innerText=(y-250).toFixed(2);
-    document.getElementById("theta").innerText=theta.toFixed(2);
-    document.getElementById("vval").innerText=v.toFixed(2);
-    document.getElementById("wval").innerText=omega.toFixed(2);
+document.getElementById("time").innerText=time.toFixed(2);
+document.getElementById("x").innerText=x.toFixed(2);
+document.getElementById("y").innerText=y.toFixed(2);
+document.getElementById("theta").innerText=theta.toFixed(2);
 
-    let R;
+document.getElementById("v").innerText=v.toFixed(2);
+document.getElementById("w").innerText=w.toFixed(2);
 
-    if(Math.abs(omega)<0.0001){
-
-        R="∞";
-
-    }else{
-
-        R=(v/omega).toFixed(2);
-
-    }
-
-    document.getElementById("rval").innerText=R;
+let R=Math.abs(w)<0.0001?"∞":(v/w).toFixed(2);
+document.getElementById("R").innerText=R;
 
 }
 
 function update(){
 
-    if(!running || paused) return;
+if(!running||paused) return;
 
-    if(time>=timeLimit){
+if(time>=timeLimit){
+running=false;
+return;
+}
 
-        running=false;
-        return;
+let wl=parseFloat(wlSlider.value);
+let wr=parseFloat(wrSlider.value);
 
-    }
+let v=(r/2)*(wr+wl);
+let w=(r/L)*(wr-wl);
 
-    let wl=parseFloat(leftSlider.value);
-    let wr=parseFloat(rightSlider.value);
+theta+=w*dt;
 
-    let v=(r/2)*(wr+wl);
-    let omega=(r/L)*(wr-wl);
+x+=v*Math.cos(theta)*dt;
+y+=v*Math.sin(theta)*dt;
 
-    theta+=omega*dt;
+time+=dt;
 
-    x+=v*Math.cos(theta)*dt;
-    y-=v*Math.sin(theta)*dt;
+path.push({x,y});
 
-    time+=dt;
+updateDisplay(v,w);
 
-    path.push({x:x,y:y});
+}
 
-    updateDisplay(v,omega);
+function drawGrid(){
+
+ctx.strokeStyle="#e6e6e6";
+ctx.lineWidth=1;
+
+for(let i=-10;i<=10;i++){
+
+ctx.beginPath();
+ctx.moveTo(originX+i*scale,0);
+ctx.lineTo(originX+i*scale,height);
+ctx.stroke();
+
+ctx.beginPath();
+ctx.moveTo(0,originY+i*scale);
+ctx.lineTo(width,originY+i*scale);
+ctx.stroke();
+
+}
+
+ctx.strokeStyle="#888";
+
+ctx.beginPath();
+ctx.moveTo(0,originY);
+ctx.lineTo(width,originY);
+ctx.stroke();
+
+ctx.beginPath();
+ctx.moveTo(originX,0);
+ctx.lineTo(originX,height);
+ctx.stroke();
+
+}
+
+function worldToCanvas(px,py){
+
+return{
+cx:originX+px*scale,
+cy:originY-py*scale
+}
+
+}
+
+function drawPath(){
+
+ctx.strokeStyle="#2c7be5";
+ctx.lineWidth=2;
+ctx.beginPath();
+
+for(let p of path){
+
+let pt=worldToCanvas(p.x,p.y);
+ctx.lineTo(pt.cx,pt.cy);
+
+}
+
+ctx.stroke();
+
+}
+
+function drawRobot(){
+
+let pt=worldToCanvas(x,y);
+
+ctx.save();
+
+ctx.translate(pt.cx,pt.cy);
+ctx.rotate(-theta);
+
+ctx.fillStyle="#e63757";
+ctx.fillRect(-15,-10,30,20);
+
+ctx.beginPath();
+ctx.moveTo(0,0);
+ctx.lineTo(20,0);
+ctx.stroke();
+
+ctx.restore();
 
 }
 
 function draw(){
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.clearRect(0,0,width,height);
 
-    ctx.beginPath();
-
-    for(let i=0;i<path.length;i++){
-
-        ctx.lineTo(path[i].x,path[i].y);
-
-    }
-
-    ctx.strokeStyle="#2c7be5";
-    ctx.lineWidth=2;
-    ctx.stroke();
-
-    ctx.save();
-
-    ctx.translate(x,y);
-    ctx.rotate(-theta);
-
-    ctx.fillStyle="#e63757";
-    ctx.fillRect(-15,-10,30,20);
-
-    ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.lineTo(20,0);
-    ctx.stroke();
-
-    ctx.restore();
+drawGrid();
+drawPath();
+drawRobot();
 
 }
 
 function loop(){
 
-    update();
-    draw();
+update();
+draw();
 
-    requestAnimationFrame(loop);
+requestAnimationFrame(loop);
 
 }
 
