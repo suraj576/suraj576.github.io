@@ -237,7 +237,7 @@ function update(){
     theta+=omega*dt;
 
     x+=v*Math.cos(theta)*dt;
-    y+=v*Math.sin(theta)*dt;
+    y-=v*Math.sin(theta)*dt;
 
     time+=dt;
 
