@@ -150,45 +150,10 @@ return dist<o.r+20
 
 }
 
-function planPath(){
-
-if(!start || !goal){
-
-alert("Select start and goal first")
-return
-
-}
-
-plannedPath=[]
-actualPath=[]
-pathIndex=0
-
-plannedPath.push(start)
-
-for(let o of obstacles){
-
-if(lineHitsObstacle(start.x,start.y,goal.x,goal.y,o)){
-
-let waypoint={
-
-x:o.x,
-y:o.y-o.r-60
-
-}
-
-plannedPath.push(waypoint)
-
-}
-
-}
-
-plannedPath.push(goal)
-
-robot.x=start.x
-robot.y=start.y
-robot.theta=0
-
-}
+ctx.fillStyle="green"
+ctx.beginPath()
+ctx.arc(start.x,start.y,8,0,Math.PI*2)
+ctx.fill()
 
 function startSimulation(){
 
