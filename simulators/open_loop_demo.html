@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Open Loop Control Demo</title>
+
+<title>Open Loop Control Demonstration</title>
 
 <style>
 
@@ -13,20 +14,21 @@ text-align:center;
 
 canvas{
 background:white;
-border-radius:10px;
+border-radius:12px;
 box-shadow:0 4px 12px rgba(0,0,0,0.15);
 }
 
 .instructions{
+margin-bottom:15px;
 font-size:14px;
-margin-bottom:10px;
 }
 
 .controls{
-margin-top:12px;
+margin-top:15px;
 }
 
 </style>
+
 </head>
 
 <body>
@@ -36,13 +38,10 @@ margin-top:12px;
 <div class="instructions">
 
 <b>Instructions</b><br>
-1. Click once → select <b>Start</b> (green)<br>
-2. Click again → select <b>Goal</b> (red)<br>
-3. Click <b>Plan Path</b><br>
-4. Click <b>Start Simulation</b><br><br>
-
-Green = planned trajectory<br>
-Red = actual robot motion
+1. Click once to set <b>Start</b> (green)<br>
+2. Click again to set <b>Goal</b> (red)<br>
+3. Press <b>Plan Path</b><br>
+4. Press <b>Start Simulation</b>
 
 </div>
 
@@ -53,7 +52,6 @@ Red = actual robot motion
 Wheel Error (%)
 
 <input type="range" id="errorSlider" min="0" max="1" step="0.1" value="0">
-
 <span id="errorValue">0</span>
 
 <br><br>
@@ -76,12 +74,11 @@ let robot={x:0,y:0,theta:0}
 
 let plannedPath=[]
 let actualPath=[]
-
 let pathIndex=0
 
-let obstacles=[]
-
 let running=false
+
+let obstacles=[]
 
 let errorBias=0
 
@@ -128,7 +125,7 @@ r:35
 
 generateObstacles()
 
-function lineHitsObstacle(x1,y1,x2,y2,o){
+function lineCircleIntersect(x1,y1,x2,y2,o){
 
 let A=x2-x1
 let B=y2-y1
@@ -138,22 +135,80 @@ let D=o.y-y1
 
 let dot=(C*A+D*B)/(A*A+B*B)
 
+dot=Math.max(0,Math.min(1,dot))
+
 let closestX=x1+dot*A
 let closestY=y1+dot*B
 
 let dx=closestX-o.x
 let dy=closestY-o.y
 
-let dist=Math.sqrt(dx*dx+dy*dy)
-
-return dist<o.r+20
+return Math.sqrt(dx*dx+dy*dy)<o.r+10
 
 }
 
-ctx.fillStyle="green"
-ctx.beginPath()
-ctx.arc(start.x,start.y,8,0,Math.PI*2)
-ctx.fill()
+function planPath(){
+
+if(!start||!goal){
+
+alert("Select start and goal first")
+return
+
+}
+
+plannedPath=[]
+actualPath=[]
+pathIndex=0
+
+plannedPath.push(start)
+
+let detours=[]
+
+for(let o of obstacles){
+
+if(lineCircleIntersect(start.x,start.y,goal.x,goal.y,o)){
+
+let dx=goal.x-start.x
+let dy=goal.y-start.y
+
+let len=Math.sqrt(dx*dx+dy*dy)
+
+let nx=-dy/len
+let ny=dx/len
+
+detours.push({
+
+x:o.x+nx*(o.r+60),
+y:o.y+ny*(o.r+60)
+
+})
+
+}
+
+}
+
+detours.sort((a,b)=>{
+
+let da=Math.hypot(a.x-start.x,a.y-start.y)
+let db=Math.hypot(b.x-start.x,b.y-start.y)
+
+return da-db
+
+})
+
+for(let p of detours){
+
+plannedPath.push(p)
+
+}
+
+plannedPath.push(goal)
+
+robot.x=start.x
+robot.y=start.y
+robot.theta=0
+
+}
 
 function startSimulation(){
 
@@ -351,7 +406,6 @@ goal=null
 
 plannedPath=[]
 actualPath=[]
-
 pathIndex=0
 
 running=false
