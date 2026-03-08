@@ -14,11 +14,16 @@ text-align:center;
 canvas{
 background:white;
 border-radius:10px;
-box-shadow:0 4px 12px rgba(0,0,0,0.1);
+box-shadow:0 4px 12px rgba(0,0,0,0.15);
 }
 
-.controls{
-margin-top:15px;
+.panel{
+margin-top:10px;
+}
+
+.instructions{
+margin-bottom:10px;
+font-size:14px;
 }
 
 </style>
@@ -29,25 +34,32 @@ margin-top:15px;
 
 <h2>Open Loop Control Demonstration</h2>
 
-<p>
-Click workspace to choose <b>start</b> and <b>goal</b>.
-Robot follows planned path without feedback.
-</p>
+<div class="instructions">
+
+<b>Instructions</b><br>
+1. Click anywhere to set the <b>start</b> position (green). <br>
+2. Click again to set the <b>goal</b> position (red). <br>
+3. Press <b>Plan Path</b>. <br>
+4. Press <b>Start Simulation</b>. <br>
+
+Green line = planned trajectory  
+Red line = actual robot motion
+
+</div>
 
 <canvas id="canvas" width="800" height="500"></canvas>
 
-<div class="controls">
+<div class="panel">
 
 Error (% wheel bias)
 
 <input type="range" id="errorSlider" min="0" max="1" step="0.1" value="0">
-
 <span id="errorValue">0</span>
 
 <br><br>
 
 <button onclick="planPath()">Plan Path</button>
-<button onclick="startSim()">Start</button>
+<button onclick="startSimulation()">Start Simulation</button>
 <button onclick="reset()">Reset</button>
 
 </div>
@@ -60,19 +72,19 @@ const ctx=canvas.getContext("2d")
 const W=canvas.width
 const H=canvas.height
 
+const grid=25
+
 let start=null
 let goal=null
 
-let obstacles=[]
-
-let gridSize=25
-
-let path=[]
-let actual=[]
-
 let robot={x:0,y:0,theta:0}
 
+let plannedPath=[]
+let actualPath=[]
+
 let running=false
+
+let obstacles=[]
 
 let errorBias=0
 
@@ -85,16 +97,18 @@ document.getElementById("errorValue").innerText=this.value
 
 canvas.onclick=function(e){
 
-let r=canvas.getBoundingClientRect()
+let rect=canvas.getBoundingClientRect()
 
-let x=e.clientX-r.left
-let y=e.clientY-r.top
+let x=e.clientX-rect.left
+let y=e.clientY-rect.top
 
 if(!start){
 
 start={x,y}
 
-}else if(!goal){
+}
+
+else if(!goal){
 
 goal={x,y}
 
@@ -102,23 +116,25 @@ goal={x,y}
 
 }
 
-function createObstacles(){
+function generateObstacles(){
 
 obstacles=[]
 
 for(let i=0;i<6;i++){
 
 obstacles.push({
+
 x:100+Math.random()*600,
 y:80+Math.random()*340,
 r:30
+
 })
 
 }
 
 }
 
-createObstacles()
+generateObstacles()
 
 function collision(x,y){
 
@@ -127,7 +143,8 @@ for(let o of obstacles){
 let dx=x-o.x
 let dy=y-o.y
 
-if(Math.sqrt(dx*dx+dy*dy)<o.r+5) return true
+if(Math.sqrt(dx*dx+dy*dy)<o.r+10)
+return true
 
 }
 
@@ -137,51 +154,56 @@ return false
 
 function planPath(){
 
-if(!start||!goal) return
+if(!start||!goal){
+alert("Please select start and goal first")
+return
+}
 
-path=[]
+plannedPath=[]
 
-let step=gridSize
+let cols=Math.floor(W/grid)
+let rows=Math.floor(H/grid)
 
-let cols=Math.floor(W/step)
-let rows=Math.floor(H/step)
+function key(x,y){return x+","+y}
 
-function nodeKey(x,y){ return x+","+y }
-
-let open=[{x:Math.floor(start.x/step),y:Math.floor(start.y/step)}]
+let open=[{
+x:Math.floor(start.x/grid),
+y:Math.floor(start.y/grid),
+g:0
+}]
 
 let came={}
-
 let visited={}
 
 while(open.length){
 
-let n=open.shift()
+let current=open.shift()
 
-let wx=n.x*step
-let wy=n.y*step
+let wx=current.x*grid
+let wy=current.y*grid
 
-if(Math.abs(wx-goal.x)<step && Math.abs(wy-goal.y)<step){
+if(Math.hypot(wx-goal.x,wy-goal.y)<grid){
 
-let key=nodeKey(n.x,n.y)
+let k=key(current.x,current.y)
 
-while(key){
+while(k){
 
-let parts=key.split(",")
+let parts=k.split(",")
 
-path.push({
-x:parts[0]*step,
-y:parts[1]*step
+plannedPath.push({
+x:parts[0]*grid,
+y:parts[1]*grid
 })
 
-key=came[key]
+k=came[k]
 
 }
 
-path.reverse()
+plannedPath.reverse()
 
 robot.x=start.x
 robot.y=start.y
+robot.theta=0
 
 return
 
@@ -191,23 +213,23 @@ let dirs=[[1,0],[-1,0],[0,1],[0,-1]]
 
 for(let d of dirs){
 
-let nx=n.x+d[0]
-let ny=n.y+d[1]
+let nx=current.x+d[0]
+let ny=current.y+d[1]
 
 if(nx<0||ny<0||nx>=cols||ny>=rows) continue
 
-let key=nodeKey(nx,ny)
+let k=key(nx,ny)
 
-if(visited[key]) continue
+if(visited[k]) continue
 
-let wx2=nx*step
-let wy2=ny*step
+let wx2=nx*grid
+let wy2=ny*grid
 
 if(collision(wx2,wy2)) continue
 
-visited[key]=true
+visited[k]=true
 
-came[key]=nodeKey(n.x,n.y)
+came[k]=key(current.x,current.y)
 
 open.push({x:nx,y:ny})
 
@@ -215,9 +237,18 @@ open.push({x:nx,y:ny})
 
 }
 
+alert("No path found")
+
 }
 
-function startSim(){
+function startSimulation(){
+
+if(plannedPath.length<2){
+
+alert("Plan path first")
+return
+
+}
 
 running=true
 
@@ -227,9 +258,9 @@ function update(){
 
 if(!running) return
 
-if(path.length<2) return
+if(plannedPath.length<1) return
 
-let target=path[0]
+let target=plannedPath[0]
 
 let dx=target.x-robot.x
 let dy=target.y-robot.y
@@ -238,31 +269,29 @@ let dist=Math.sqrt(dx*dx+dy*dy)
 
 if(dist<5){
 
-path.shift()
+plannedPath.shift()
 
-if(path.length==0){
+if(plannedPath.length==0){
 
 running=false
 return
 
 }
 
-target=path[0]
+target=plannedPath[0]
 
 }
 
 let desiredAngle=Math.atan2(dy,dx)
 
+robot.theta += (desiredAngle-robot.theta)*0.2
+
 let speed=1.5
 
-robot.theta+= (desiredAngle-robot.theta)*0.2
+robot.x += speed*Math.cos(robot.theta)*(1+errorBias)
+robot.y += speed*Math.sin(robot.theta)
 
-let drift=1+errorBias
-
-robot.x+=speed*Math.cos(robot.theta)*drift
-robot.y+=speed*Math.sin(robot.theta)
-
-actual.push({x:robot.x,y:robot.y})
+actualPath.push({x:robot.x,y:robot.y})
 
 }
 
@@ -270,7 +299,7 @@ function drawGrid(){
 
 ctx.strokeStyle="#eee"
 
-for(let x=0;x<W;x+=gridSize){
+for(let x=0;x<W;x+=grid){
 
 ctx.beginPath()
 ctx.moveTo(x,0)
@@ -279,7 +308,7 @@ ctx.stroke()
 
 }
 
-for(let y=0;y<H;y+=gridSize){
+for(let y=0;y<H;y+=grid){
 
 ctx.beginPath()
 ctx.moveTo(0,y)
@@ -292,7 +321,7 @@ ctx.stroke()
 
 function drawObstacles(){
 
-ctx.fillStyle="#999"
+ctx.fillStyle="#888"
 
 for(let o of obstacles){
 
@@ -304,9 +333,31 @@ ctx.fill()
 
 }
 
-function drawPath(){
+function drawPoints(){
 
-if(path.length<2) return
+if(start){
+
+ctx.fillStyle="green"
+ctx.beginPath()
+ctx.arc(start.x,start.y,8,0,Math.PI*2)
+ctx.fill()
+
+}
+
+if(goal){
+
+ctx.fillStyle="red"
+ctx.beginPath()
+ctx.arc(goal.x,goal.y,8,0,Math.PI*2)
+ctx.fill()
+
+}
+
+}
+
+function drawPlanned(){
+
+if(plannedPath.length<1) return
 
 ctx.strokeStyle="green"
 ctx.lineWidth=2
@@ -315,7 +366,7 @@ ctx.beginPath()
 
 ctx.moveTo(start.x,start.y)
 
-for(let p of path){
+for(let p of plannedPath){
 
 ctx.lineTo(p.x,p.y)
 
@@ -331,7 +382,7 @@ ctx.strokeStyle="red"
 
 ctx.beginPath()
 
-for(let p of actual){
+for(let p of actualPath){
 
 ctx.lineTo(p.x,p.y)
 
@@ -355,37 +406,15 @@ ctx.restore()
 
 }
 
-function drawPoints(){
-
-if(start){
-
-ctx.fillStyle="green"
-ctx.beginPath()
-ctx.arc(start.x,start.y,7,0,Math.PI*2)
-ctx.fill()
-
-}
-
-if(goal){
-
-ctx.fillStyle="red"
-ctx.beginPath()
-ctx.arc(goal.x,goal.y,7,0,Math.PI*2)
-ctx.fill()
-
-}
-
-}
-
 function draw(){
 
 ctx.clearRect(0,0,W,H)
 
 drawGrid()
 drawObstacles()
-drawPath()
-drawActual()
 drawPoints()
+drawPlanned()
+drawActual()
 drawRobot()
 
 }
@@ -406,12 +435,12 @@ function reset(){
 start=null
 goal=null
 
-path=[]
-actual=[]
+plannedPath=[]
+actualPath=[]
 
 running=false
 
-createObstacles()
+generateObstacles()
 
 }
 
