@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Open Loop Control Demo</title>
+
+<style>
+
+body{
+font-family:system-ui;
+background:#f4f6f8;
+text-align:center;
+}
+
+canvas{
+background:white;
+border-radius:8px;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+
+button{
+padding:10px 16px;
+margin:5px;
+border:none;
+border-radius:6px;
+background:#2c7be5;
+color:white;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>Open Loop Control Demonstration</h2>
+
+<p>Robot executes a precomputed trajectory without feedback</p>
+
+<canvas id="canvas" width="700" height="500"></canvas>
+
+<br>
+
+<button onclick="start()">Start</button>
+<button onclick="reset()">Reset</button>
+
+<script>
+
+const canvas=document.getElementById("canvas")
+const ctx=canvas.getContext("2d")
+
+const originX=350
+const originY=250
+
+let x=0
+let y=0
+let theta=0
+
+let pathActual=[]
+let pathExpected=[]
+
+let running=false
+
+let dt=0.05
+let time=0
+
+function worldToCanvas(px,py){
+
+return{
+x:originX+px*50,
+y:originY-py*50
+}
+
+}
+
+function trajectory(t){
+
+if(t<5){
+
+return {v:1, w:0}
+
+}
+
+else if(t<10){
+
+return {v:1, w:0.3}
+
+}
+
+else if(t<15){
+
+return {v:1, w:0}
+
+}
+
+else{
+
+return {v:0,w:0}
+
+}
+
+}
+
+function update(){
+
+if(!running) return
+
+let cmd=trajectory(time)
+
+let v=cmd.v
+let w=cmd.w
+
+/* expected motion */
+
+let xe=0
+let ye=0
+let the=0
+
+if(pathExpected.length==0){
+
+xe=0
+ye=0
+the=0
+
+}else{
+
+xe=pathExpected[pathExpected.length-1].x
+ye=pathExpected[pathExpected.length-1].y
+the=pathExpected[pathExpected.length-1].theta
+
+}
+
+the+=w*dt
+
+xe+=v*Math.cos(the)*dt
+ye+=v*Math.sin(the)*dt
+
+pathExpected.push({x:xe,y:ye,theta:the})
+
+/* actual motion with error */
+
+let vError=v*0.95
+
+theta+=w*dt
+
+x+=vError*Math.cos(theta)*dt
+y+=vError*Math.sin(theta)*dt
+
+pathActual.push({x,y})
+
+time+=dt
+
+}
+
+function drawGrid(){
+
+ctx.strokeStyle="#e6e6e6"
+
+for(let i=-10;i<10;i++){
+
+ctx.beginPath()
+ctx.moveTo(originX+i*50,0)
+ctx.lineTo(originX+i*50,500)
+ctx.stroke()
+
+ctx.beginPath()
+ctx.moveTo(0,originY+i*50)
+ctx.lineTo(700,originY+i*50)
+ctx.stroke()
+
+}
+
+}
+
+function draw(){
+
+ctx.clearRect(0,0,700,500)
+
+drawGrid()
+
+/* expected path */
+
+ctx.strokeStyle="green"
+ctx.beginPath()
+
+for(let p of pathExpected){
+
+let c=worldToCanvas(p.x,p.y)
+
+ctx.lineTo(c.x,c.y)
+
+}
+
+ctx.stroke()
+
+/* actual path */
+
+ctx.strokeStyle="red"
+ctx.beginPath()
+
+for(let p of pathActual){
+
+let c=worldToCanvas(p.x,p.y)
+
+ctx.lineTo(c.x,c.y)
+
+}
+
+ctx.stroke()
+
+/* robot */
+
+let r=worldToCanvas(x,y)
+
+ctx.fillStyle="black"
+
+ctx.beginPath()
+ctx.arc(r.x,r.y,6,0,Math.PI*2)
+ctx.fill()
+
+}
+
+function loop(){
+
+update()
+draw()
+
+requestAnimationFrame(loop)
+
+}
+
+loop()
+
+function start(){
+
+running=true
+
+}
+
+function reset(){
+
+running=false
+
+time=0
+
+x=0
+y=0
+theta=0
+
+pathActual=[]
+pathExpected=[]
+
+}
+
+</script>
+
+</body>
+</html>
