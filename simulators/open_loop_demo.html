@@ -327,22 +327,40 @@ ctx.fill()
 
 }
 
+
 function drawPlanned(){
 
-if(plannedPath.length<2) return
+if(plannedPath.length < 2) return
 
 ctx.strokeStyle="green"
 ctx.lineWidth=2
 
 ctx.beginPath()
 
-ctx.moveTo(plannedPath[0].x,plannedPath[0].y)
+ctx.moveTo(plannedPath[0].x, plannedPath[0].y)
 
-for(let p of plannedPath){
+for(let i=1;i<plannedPath.length-1;i++){
 
-ctx.lineTo(p.x,p.y)
+let xc = (plannedPath[i].x + plannedPath[i+1].x)/2
+let yc = (plannedPath[i].y + plannedPath[i+1].y)/2
+
+ctx.quadraticCurveTo(
+    plannedPath[i].x,
+    plannedPath[i].y,
+    xc,
+    yc
+)
 
 }
+
+let last = plannedPath.length-1
+
+ctx.quadraticCurveTo(
+plannedPath[last-1].x,
+plannedPath[last-1].y,
+plannedPath[last].x,
+plannedPath[last].y
+)
 
 ctx.stroke()
 
