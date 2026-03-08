@@ -1,18 +1,129 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 20%;
-        }
-    </style>
+<title>Differential Drive Simulator</title>
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+}
+
+canvas {
+    border: 1px solid black;
+}
+
+.controls {
+    margin-top: 10px;
+}
+</style>
 </head>
+
 <body>
-    <h1>Hey, welcome to my website!</h1>
+
+<h2>Differential Drive Robot Simulator</h2>
+
+<canvas id="simCanvas" width="700" height="500"></canvas>
+
+<div class="controls">
+Left Wheel Speed (rad/s)
+<input type="range" id="leftWheel" min="-10" max="10" step="0.1" value="2">
+<span id="leftVal">2</span>
+
+<br><br>
+
+Right Wheel Speed (rad/s)
+<input type="range" id="rightWheel" min="-10" max="10" step="0.1" value="2">
+<span id="rightVal">2</span>
+
+<br><br>
+
+<button onclick="resetSim()">Reset</button>
+</div>
+
+<script>
+
+const canvas = document.getElementById("simCanvas");
+const ctx = canvas.getContext("2d");
+
+let x = 350;
+let y = 250;
+let theta = 0;
+
+const r = 10;       // wheel radius
+const L = 40;       // wheel separation
+
+let path = [];
+
+const leftSlider = document.getElementById("leftWheel");
+const rightSlider = document.getElementById("rightWheel");
+
+const leftVal = document.getElementById("leftVal");
+const rightVal = document.getElementById("rightVal");
+
+leftSlider.oninput = () => leftVal.innerText = leftSlider.value;
+rightSlider.oninput = () => rightVal.innerText = rightSlider.value;
+
+function resetSim(){
+    x = 350;
+    y = 250;
+    theta = 0;
+    path = [];
+}
+
+function update(){
+
+    let wl = parseFloat(leftSlider.value);
+    let wr = parseFloat(rightSlider.value);
+
+    let v = r/2 * (wr + wl);
+    let omega = r/L * (wr - wl);
+
+    theta += omega * 0.1;
+
+    x += v * Math.cos(theta) * 0.1;
+    y += v * Math.sin(theta) * 0.1;
+
+    path.push({x:x,y:y});
+}
+
+function draw(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // draw trajectory
+    ctx.beginPath();
+    for(let i=0;i<path.length;i++){
+        ctx.lineTo(path[i].x,path[i].y);
+    }
+    ctx.strokeStyle="blue";
+    ctx.stroke();
+
+    // draw robot
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(theta);
+
+    ctx.fillStyle="red";
+    ctx.fillRect(-15,-10,30,20);
+
+    // heading line
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(20,0);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+</script>
+
 </body>
 </html>
