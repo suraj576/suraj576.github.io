@@ -1,60 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
 <title>Differential Drive Simulator</title>
 
 <style>
+
 body{
-    font-family: Arial;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto;
+    background:#f4f6f8;
+    margin:0;
     text-align:center;
 }
 
-canvas{
-    border:1px solid black;
+.header{
+    background:white;
+    padding:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.1);
 }
 
-.controls{
-    margin-top:10px;
+.container{
+    display:flex;
+    justify-content:center;
+    gap:30px;
+    margin-top:30px;
+    flex-wrap:wrap;
+}
+
+.panel{
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1);
+    width:320px;
+}
+
+canvas{
+    background:white;
+    border-radius:12px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+
+label{
+    font-size:14px;
+}
+
+input[type=range]{
+    width:100%;
+}
+
+button{
+    margin:5px;
+    padding:10px 16px;
+    border:none;
+    border-radius:6px;
+    background:#2c7be5;
+    color:white;
+    font-size:14px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1a68d1;
 }
 
 .info{
-    margin-top:10px;
-    font-size:16px;
+    text-align:left;
+    font-size:14px;
+    margin-top:15px;
 }
+
 </style>
 </head>
 
 <body>
 
+<div class="header">
 <h2>Differential Drive Robot Simulator</h2>
+</div>
+
+<div class="container">
 
 <canvas id="simCanvas" width="700" height="500"></canvas>
 
-<div class="controls">
+<div class="panel">
 
-Left Wheel Speed (rad/s)
+<label>Left Wheel Speed (rad/s)</label>
 <input type="range" id="leftWheel" min="-10" max="10" step="0.1" value="2">
-<span id="leftVal">2</span>
+<div id="leftVal">2</div>
 
-<br><br>
+<br>
 
-Right Wheel Speed (rad/s)
+<label>Right Wheel Speed (rad/s)</label>
 <input type="range" id="rightWheel" min="-10" max="10" step="0.1" value="2">
-<span id="rightVal">2</span>
+<div id="rightVal">2</div>
+
+<br>
+
+<label>Simulation Time (seconds)</label>
+<input type="number" id="timeLimit" value="10">
 
 <br><br>
 
-<button onclick="resetSim()">Reset</button>
-
-</div>
+<button onclick="startSim()">Start</button>
+<button onclick="pauseSim()">Pause</button>
+<button onclick="stopSim()">Stop</button>
 
 <div class="info">
 
-Simulation Time: <span id="time">0.0</span> s <br>
-Position: (<span id="xpos">0</span>, <span id="ypos">0</span>) <br>
-Orientation: <span id="theta">0</span> rad <br>
-Linear Velocity v: <span id="vval">0</span> m/s <br>
-Angular Velocity ω: <span id="wval">0</span> rad/s
+<p><b>Time:</b> <span id="time">0</span> s</p>
+<p><b>Position:</b> (<span id="xpos">0</span>, <span id="ypos">0</span>)</p>
+<p><b>Orientation:</b> <span id="theta">0</span> rad</p>
+<p><b>Linear Velocity v:</b> <span id="vval">0</span> m/s</p>
+<p><b>Angular Velocity ω:</b> <span id="wval">0</span> rad/s</p>
+
+</div>
+
+</div>
 
 </div>
 
@@ -68,55 +130,84 @@ let y = 250;
 let theta = 0;
 
 let time = 0;
-
-const dt = 0.1;
+let dt = 0.05;
 
 const r = 10;
 const L = 40;
 
-let path=[];
+let path = [];
+
+let running=false;
+let paused=false;
+let timeLimit=10;
 
 const leftSlider=document.getElementById("leftWheel");
 const rightSlider=document.getElementById("rightWheel");
 
-const leftVal=document.getElementById("leftVal");
-const rightVal=document.getElementById("rightVal");
+leftSlider.oninput=()=>document.getElementById("leftVal").innerText=leftSlider.value;
+rightSlider.oninput=()=>document.getElementById("rightVal").innerText=rightSlider.value;
 
-leftSlider.oninput=()=>leftVal.innerText=leftSlider.value;
-rightSlider.oninput=()=>rightVal.innerText=rightSlider.value;
+function startSim(){
 
-function resetSim(){
+    running=true;
+    paused=false;
+    timeLimit=parseFloat(document.getElementById("timeLimit").value);
+
+}
+
+function pauseSim(){
+
+    paused=!paused;
+
+}
+
+function stopSim(){
+
+    running=false;
+    paused=false;
 
     x=350;
     y=250;
     theta=0;
     time=0;
+
     path=[];
+
 }
 
 function update(){
 
+    if(!running || paused) return;
+
+    if(time>=timeLimit){
+
+        running=false;
+        return;
+
+    }
+
     let wl=parseFloat(leftSlider.value);
     let wr=parseFloat(rightSlider.value);
 
-    let v = (r/2)*(wr+wl);
-    let omega = (r/L)*(wr-wl);
+    let v=(r/2)*(wr+wl);
+    let omega=(r/L)*(wr-wl);
 
-    theta += omega*dt;
+    theta+=omega*dt;
 
-    x += v*Math.cos(theta)*dt;
-    y += v*Math.sin(theta)*dt;
+    x+=v*Math.cos(theta)*dt;
+    y+=v*Math.sin(theta)*dt;
 
-    time += dt;
+    time+=dt;
 
     path.push({x:x,y:y});
 
-    document.getElementById("time").innerText=time.toFixed(1);
+    document.getElementById("time").innerText=time.toFixed(2);
     document.getElementById("xpos").innerText=(x-350).toFixed(2);
     document.getElementById("ypos").innerText=(250-y).toFixed(2);
     document.getElementById("theta").innerText=theta.toFixed(2);
     document.getElementById("vval").innerText=v.toFixed(2);
     document.getElementById("wval").innerText=omega.toFixed(2);
+
 }
 
 function draw(){
@@ -125,10 +216,13 @@ function draw(){
 
     ctx.beginPath();
     for(let i=0;i<path.length;i++){
+
         ctx.lineTo(path[i].x,path[i].y);
+
     }
 
-    ctx.strokeStyle="blue";
+    ctx.strokeStyle="#2c7be5";
+    ctx.lineWidth=2;
     ctx.stroke();
 
     ctx.save();
@@ -136,7 +230,7 @@ function draw(){
     ctx.translate(x,y);
     ctx.rotate(theta);
 
-    ctx.fillStyle="red";
+    ctx.fillStyle="#e63757";
     ctx.fillRect(-15,-10,30,20);
 
     ctx.beginPath();
@@ -145,6 +239,7 @@ function draw(){
     ctx.stroke();
 
     ctx.restore();
+
 }
 
 function loop(){
@@ -153,6 +248,7 @@ function loop(){
     draw();
 
     requestAnimationFrame(loop);
+
 }
 
 loop();
