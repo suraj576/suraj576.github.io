@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <title>Open Loop Control Demo</title>
 
 <style>
@@ -31,22 +30,24 @@ margin-top:15px;
 <h2>Open Loop Control Demonstration</h2>
 
 <p>
-Click to select <b>Start</b> and <b>Goal</b>.  
-Robot follows a precomputed trajectory without feedback.
+Click workspace to choose <b>start</b> and <b>goal</b>.
+Robot follows planned path without feedback.
 </p>
 
 <canvas id="canvas" width="800" height="500"></canvas>
 
 <div class="controls">
 
-Error (%):
+Error (% wheel bias)
+
 <input type="range" id="errorSlider" min="0" max="1" step="0.1" value="0">
+
 <span id="errorValue">0</span>
 
 <br><br>
 
-<button onclick="generatePath()">Generate Path</button>
-<button onclick="startSimulation()">Start</button>
+<button onclick="planPath()">Plan Path</button>
+<button onclick="startSim()">Start</button>
 <button onclick="reset()">Reset</button>
 
 </div>
@@ -56,90 +57,167 @@ Error (%):
 const canvas=document.getElementById("canvas")
 const ctx=canvas.getContext("2d")
 
-const width=canvas.width
-const height=canvas.height
+const W=canvas.width
+const H=canvas.height
 
 let start=null
 let goal=null
 
-let robot={x:0,y:0,theta:0}
+let obstacles=[]
+
+let gridSize=25
 
 let path=[]
-let actualPath=[]
+let actual=[]
 
-let obstacles=[]
+let robot={x:0,y:0,theta:0}
 
 let running=false
 
-let errorPercent=0
+let errorBias=0
 
 document.getElementById("errorSlider").oninput=function(){
 
-errorPercent=parseFloat(this.value)/100
+errorBias=parseFloat(this.value)/100
 document.getElementById("errorValue").innerText=this.value
 
 }
 
-canvas.addEventListener("click",function(e){
+canvas.onclick=function(e){
 
-let rect=canvas.getBoundingClientRect()
+let r=canvas.getBoundingClientRect()
 
-let x=e.clientX-rect.left
-let y=e.clientY-rect.top
+let x=e.clientX-r.left
+let y=e.clientY-r.top
 
 if(!start){
 
 start={x,y}
 
-}
-
-else if(!goal){
+}else if(!goal){
 
 goal={x,y}
 
 }
 
-})
+}
 
-function generateObstacles(){
+function createObstacles(){
 
 obstacles=[]
 
-for(let i=0;i<5;i++){
+for(let i=0;i<6;i++){
 
 obstacles.push({
-
-x:Math.random()*700+50,
-y:Math.random()*400+50,
-r:20+Math.random()*15
-
+x:100+Math.random()*600,
+y:80+Math.random()*340,
+r:30
 })
 
 }
 
 }
 
-generateObstacles()
+createObstacles()
 
-function generatePath(){
+function collision(x,y){
+
+for(let o of obstacles){
+
+let dx=x-o.x
+let dy=y-o.y
+
+if(Math.sqrt(dx*dx+dy*dy)<o.r+5) return true
+
+}
+
+return false
+
+}
+
+function planPath(){
 
 if(!start||!goal) return
 
 path=[]
 
-let midX=(start.x+goal.x)/2
-let midY=(start.y+goal.y)/2-80
+let step=gridSize
 
-path.push(start)
-path.push({x:midX,y:midY})
-path.push(goal)
+let cols=Math.floor(W/step)
+let rows=Math.floor(H/step)
+
+function nodeKey(x,y){ return x+","+y }
+
+let open=[{x:Math.floor(start.x/step),y:Math.floor(start.y/step)}]
+
+let came={}
+
+let visited={}
+
+while(open.length){
+
+let n=open.shift()
+
+let wx=n.x*step
+let wy=n.y*step
+
+if(Math.abs(wx-goal.x)<step && Math.abs(wy-goal.y)<step){
+
+let key=nodeKey(n.x,n.y)
+
+while(key){
+
+let parts=key.split(",")
+
+path.push({
+x:parts[0]*step,
+y:parts[1]*step
+})
+
+key=came[key]
+
+}
+
+path.reverse()
 
 robot.x=start.x
 robot.y=start.y
 
+return
+
 }
 
-function startSimulation(){
+let dirs=[[1,0],[-1,0],[0,1],[0,-1]]
+
+for(let d of dirs){
+
+let nx=n.x+d[0]
+let ny=n.y+d[1]
+
+if(nx<0||ny<0||nx>=cols||ny>=rows) continue
+
+let key=nodeKey(nx,ny)
+
+if(visited[key]) continue
+
+let wx2=nx*step
+let wy2=ny*step
+
+if(collision(wx2,wy2)) continue
+
+visited[key]=true
+
+came[key]=nodeKey(n.x,n.y)
+
+open.push({x:nx,y:ny})
+
+}
+
+}
+
+}
+
+function startSim(){
 
 running=true
 
@@ -158,7 +236,7 @@ let dy=target.y-robot.y
 
 let dist=Math.sqrt(dx*dx+dy*dy)
 
-if(dist<3){
+if(dist<5){
 
 path.shift()
 
@@ -173,18 +251,18 @@ target=path[0]
 
 }
 
-let angle=Math.atan2(dy,dx)
-
-robot.theta=angle
+let desiredAngle=Math.atan2(dy,dx)
 
 let speed=1.5
 
-let error=1-(Math.random()*errorPercent)
+robot.theta+= (desiredAngle-robot.theta)*0.2
 
-robot.x+=speed*Math.cos(angle)*error
-robot.y+=speed*Math.sin(angle)*error
+let drift=1+errorBias
 
-actualPath.push({x:robot.x,y:robot.y})
+robot.x+=speed*Math.cos(robot.theta)*drift
+robot.y+=speed*Math.sin(robot.theta)
+
+actual.push({x:robot.x,y:robot.y})
 
 }
 
@@ -192,20 +270,20 @@ function drawGrid(){
 
 ctx.strokeStyle="#eee"
 
-for(let x=0;x<width;x+=40){
+for(let x=0;x<W;x+=gridSize){
 
 ctx.beginPath()
 ctx.moveTo(x,0)
-ctx.lineTo(x,height)
+ctx.lineTo(x,H)
 ctx.stroke()
 
 }
 
-for(let y=0;y<height;y+=40){
+for(let y=0;y<H;y+=gridSize){
 
 ctx.beginPath()
 ctx.moveTo(0,y)
-ctx.lineTo(width,y)
+ctx.lineTo(W,y)
 ctx.stroke()
 
 }
@@ -226,34 +304,13 @@ ctx.fill()
 
 }
 
-function drawPoints(){
-
-if(start){
-
-ctx.fillStyle="green"
-ctx.beginPath()
-ctx.arc(start.x,start.y,8,0,Math.PI*2)
-ctx.fill()
-
-}
-
-if(goal){
-
-ctx.fillStyle="red"
-ctx.beginPath()
-ctx.arc(goal.x,goal.y,8,0,Math.PI*2)
-ctx.fill()
-
-}
-
-}
-
 function drawPath(){
 
-if(path.length<1) return
+if(path.length<2) return
 
 ctx.strokeStyle="green"
 ctx.lineWidth=2
+
 ctx.beginPath()
 
 ctx.moveTo(start.x,start.y)
@@ -268,12 +325,13 @@ ctx.stroke()
 
 }
 
-function drawActualPath(){
+function drawActual(){
 
 ctx.strokeStyle="red"
+
 ctx.beginPath()
 
-for(let p of actualPath){
+for(let p of actual){
 
 ctx.lineTo(p.x,p.y)
 
@@ -291,27 +349,43 @@ ctx.translate(robot.x,robot.y)
 ctx.rotate(robot.theta)
 
 ctx.fillStyle="black"
-
-ctx.fillRect(-8,-6,16,12)
+ctx.fillRect(-8,-5,16,10)
 
 ctx.restore()
 
 }
 
+function drawPoints(){
+
+if(start){
+
+ctx.fillStyle="green"
+ctx.beginPath()
+ctx.arc(start.x,start.y,7,0,Math.PI*2)
+ctx.fill()
+
+}
+
+if(goal){
+
+ctx.fillStyle="red"
+ctx.beginPath()
+ctx.arc(goal.x,goal.y,7,0,Math.PI*2)
+ctx.fill()
+
+}
+
+}
+
 function draw(){
 
-ctx.clearRect(0,0,width,height)
+ctx.clearRect(0,0,W,H)
 
 drawGrid()
-
 drawObstacles()
-
-drawPoints()
-
 drawPath()
-
-drawActualPath()
-
+drawActual()
+drawPoints()
 drawRobot()
 
 }
@@ -333,11 +407,11 @@ start=null
 goal=null
 
 path=[]
-actualPath=[]
+actual=[]
 
 running=false
 
-generateObstacles()
+createObstacles()
 
 }
 
