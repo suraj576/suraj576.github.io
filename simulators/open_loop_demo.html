@@ -26,15 +26,359 @@ margin-bottom:10px;
 margin-top:10px;
 }
 
-progress{
-width:220px;
+</style>
+
+</head>
+
+<body>
+
+<h2>Open Loop Control Demonstration</h2>
+
+<div class="instructions">
+
+<b>Instructions</b><br>
+
+1. Click once to set <b>Start</b> (green).<br>
+2. Click again to set <b>Goal</b> (red).<br>
+3. Press <b>Plan Path</b>.<br>
+4. Press <b>Start Simulation</b>.
+
+</div>
+
+<canvas id="canvas" width="800" height="500"></canvas>
+
+<div class="controls">
+
+Wheel Error (%)
+
+<input type="range" id="errorSlider" min="0" max="1" step="0.1" value="0">
+<span id="errorValue">0</span>
+
+<br><br>
+
+<button onclick="planPath()">Plan Path</button>
+<button onclick="startSimulation()">Start Simulation</button>
+<button onclick="reset()">Reset</button>
+
+</div>
+
+<script>
+
+const canvas=document.getElementById("canvas")
+const ctx=canvas.getContext("2d")
+
+let start=null
+let goal=null
+
+let robot={x:0,y:0,theta:0}
+
+let plannedPath=[]
+let actualPath=[]
+
+let obstacles=[]
+
+let running=false
+
+let errorBias=0
+
+document.getElementById("errorSlider").oninput=function(){
+
+errorBias=parseFloat(this.value)/100
+document.getElementById("errorValue").innerText=this.value
+
 }
 
-.status{
-font-size:13px;
-margin-top:6px;
+canvas.onclick=function(e){
+
+let rect=canvas.getBoundingClientRect()
+
+let x=e.clientX-rect.left
+let y=e.clientY-rect.top
+
+if(!start){
+start={x,y}
+}
+else if(!goal){
+goal={x,y}
 }
 
+}
+
+function generateObstacles(){
+
+obstacles=[]
+
+for(let i=0;i<5;i++){
+
+obstacles.push({
+
+x:150+Math.random()*500,
+y:100+Math.random()*300,
+r:35
+
+})
+
+}
+
+}
+
+generateObstacles()
+
+function planPath(){
+
+if(!start || !goal){
+
+alert("Select start and goal first")
+
+return
+
+}
+
+plannedPath=[]
+
+let current=start
+
+plannedPath.push(current)
+
+for(let o of obstacles){
+
+let dx=goal.x-start.x
+let dy=goal.y-start.y
+
+let dist=Math.abs((o.x-start.x)*dy-(o.y-start.y)*dx)/Math.sqrt(dx*dx+dy*dy)
+
+if(dist<o.r+30){
+
+let waypoint={
+
+x:o.x,
+y:o.y-o.r-50
+
+}
+
+plannedPath.push(waypoint)
+
+}
+
+}
+
+plannedPath.push(goal)
+
+robot.x=start.x
+robot.y=start.y
+robot.theta=0
+
+}
+
+function startSimulation(){
+
+if(plannedPath.length<2){
+
+alert("Plan path first")
+
+return
+
+}
+
+running=true
+
+}
+
+function update(){
+
+if(!running) return
+
+if(plannedPath.length===0) return
+
+let target=plannedPath[0]
+
+let dx=target.x-robot.x
+let dy=target.y-robot.y
+
+let dist=Math.sqrt(dx*dx+dy*dy)
+
+if(dist<5){
+
+plannedPath.shift()
+
+if(plannedPath.length===0){
+
+running=false
+
+return
+
+}
+
+target=plannedPath[0]
+
+}
+
+let desiredAngle=Math.atan2(dy,dx)
+
+robot.theta+=0.2*(desiredAngle-robot.theta)
+
+let speed=2
+
+robot.x+=speed*Math.cos(robot.theta)*(1+errorBias)
+robot.y+=speed*Math.sin(robot.theta)
+
+actualPath.push({x:robot.x,y:robot.y})
+
+}
+
+function drawGrid(){
+
+ctx.strokeStyle="#eee"
+
+for(let x=0;x<800;x+=25){
+
+ctx.beginPath()
+ctx.moveTo(x,0)
+ctx.lineTo(x,500)
+ctx.stroke()
+
+}
+
+for(let y=0;y<500;y+=25){
+
+ctx.beginPath()
+ctx.moveTo(0,y)
+ctx.lineTo(800,y)
+ctx.stroke()
+
+}
+
+}
+
+function drawObstacles(){
+
+ctx.fillStyle="#888"
+
+for(let o of obstacles){
+
+ctx.beginPath()
+ctx.arc(o.x,o.y,o.r,0,Math.PI*2)
+ctx.fill()
+
+}
+
+}
+
+function drawPoints(){
+
+if(start){
+
+ctx.fillStyle="green"
+ctx.beginPath()
+ctx.arc(start.x,start.y,8,0,Math.PI*2)
+ctx.fill()
+
+}
+
+if(goal){
+
+ctx.fillStyle="red"
+ctx.beginPath()
+ctx.arc(goal.x,goal.y,8,0,Math.PI*2)
+ctx.fill()
+
+}
+
+}
+
+function drawPlanned(){
+
+if(plannedPath.length<1) return
+
+ctx.strokeStyle="green"
+ctx.lineWidth=2
+
+ctx.beginPath()
+
+ctx.moveTo(start.x,start.y)
+
+for(let p of plannedPath){
+
+ctx.lineTo(p.x,p.y)
+
+}
+
+ctx.stroke()
+
+}
+
+function drawActual(){
+
+ctx.strokeStyle="red"
+
+ctx.beginPath()
+
+for(let p of actualPath){
+
+ctx.lineTo(p.x,p.y)
+
+}
+
+ctx.stroke()
+
+}
+
+function drawRobot(){
+
+ctx.save()
+
+ctx.translate(robot.x,robot.y)
+ctx.rotate(robot.theta)
+
+ctx.fillStyle="black"
+ctx.fillRect(-8,-5,16,10)
+
+ctx.restore()
+
+}
+
+function draw(){
+
+ctx.clearRect(0,0,800,500)
+
+drawGrid()
+drawObstacles()
+drawPoints()
+drawPlanned()
+drawActual()
+drawRobot()
+
+}
+
+function loop(){
+
+update()
+draw()
+
+requestAnimationFrame(loop)
+
+}
+
+loop()
+
+function reset(){
+
+start=null
+goal=null
+
+plannedPath=[]
+actualPath=[]
+
+running=false
+
+generateObstacles()
+
+}
+
+</script>
+
+</body>
+</html>
 </style>
 
 </head>
