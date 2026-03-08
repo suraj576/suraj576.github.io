@@ -253,12 +253,15 @@ target=plannedPath[pathIndex]
 
 let desiredAngle=Math.atan2(dy,dx)
 
-robot.theta+=0.2*(desiredAngle-robot.theta)
+robot.theta += 0.2 * (desiredAngle - robot.theta)
 
-let speed=2
+/* simulate wheel mismatch causing heading drift */
+robot.theta += errorBias * 0.1
 
-robot.x+=speed*Math.cos(robot.theta)*(1+errorBias)
-robot.y+=speed*Math.sin(robot.theta)
+let speed = 2
+
+robot.x += speed * Math.cos(robot.theta)
+robot.y += speed * Math.sin(robot.theta)
 
 actualPath.push({x:robot.x,y:robot.y})
 
