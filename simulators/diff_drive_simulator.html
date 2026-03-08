@@ -150,9 +150,15 @@ rightSlider.oninput=()=>document.getElementById("rightVal").innerText=rightSlide
 
 function startSim(){
 
-    running=true;
-    paused=false;
-    timeLimit=parseFloat(document.getElementById("timeLimit").value);
+    timeLimit = parseFloat(document.getElementById("timeLimit").value);
+
+    if(time >= timeLimit){
+        time = 0;
+        path = [];
+    }
+
+    running = true;
+    paused = false;
 
 }
 
@@ -177,6 +183,7 @@ function resetSim(){
     x=350;
     y=250;
     theta=0;
+
     time=0;
 
     path=[];
