@@ -227,46 +227,47 @@ function update(){
 
 if(!running) return
 
-if(pathIndex>=plannedPath.length) return
+if(pathIndex >= plannedPath.length-1){
+running = false
+return
+}
 
-let target=plannedPath[pathIndex]
+let target = plannedPath[pathIndex+1]
 
-let dx=target.x-robot.x
-let dy=target.y-robot.y
+let dx = target.x - robot.x
+let dy = target.y - robot.y
 
-let dist=Math.sqrt(dx*dx+dy*dy)
+let dist = Math.sqrt(dx*dx + dy*dy)
 
-if(dist<5){
+let speed = 2
+
+if(dist < speed){
+
+robot.x = target.x
+robot.y = target.y
 
 pathIndex++
 
-if(pathIndex>=plannedPath.length){
-
-running=false
 return
 
 }
 
-target=plannedPath[pathIndex]
+/* compute direction of motion */
 
-}
+let angle = Math.atan2(dy,dx)
 
-let desiredAngle=Math.atan2(dy,dx)
+/* introduce heading error only when slider > 0 */
 
-robot.theta += 0.2 * (desiredAngle - robot.theta)
+angle += errorBias * 0.5
 
-/* simulate wheel mismatch causing heading drift */
-robot.theta += errorBias * 0.1
+robot.theta = angle
 
-let speed = 2
-
-robot.x += speed * Math.cos(robot.theta)
-robot.y += speed * Math.sin(robot.theta)
+robot.x += speed * Math.cos(angle)
+robot.y += speed * Math.sin(angle)
 
 actualPath.push({x:robot.x,y:robot.y})
 
 }
-
 function drawGrid(){
 
 ctx.strokeStyle="#eee"
