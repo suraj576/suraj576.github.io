@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Open Loop Control Demo</title>
 
 <style>
@@ -13,90 +14,134 @@ text-align:center;
 
 canvas{
 background:white;
-border-radius:8px;
-box-shadow:0 4px 10px rgba(0,0,0,0.1);
+border-radius:10px;
+box-shadow:0 4px 12px rgba(0,0,0,0.1);
 }
 
-button{
-padding:10px 16px;
-margin:5px;
-border:none;
-border-radius:6px;
-background:#2c7be5;
-color:white;
-cursor:pointer;
+.controls{
+margin-top:15px;
 }
 
 </style>
+
 </head>
 
 <body>
 
 <h2>Open Loop Control Demonstration</h2>
 
-<p>Robot executes a precomputed trajectory without feedback</p>
+<p>
+Click to select <b>Start</b> and <b>Goal</b>.  
+Robot follows a precomputed trajectory without feedback.
+</p>
 
-<canvas id="canvas" width="700" height="500"></canvas>
+<canvas id="canvas" width="800" height="500"></canvas>
 
-<br>
+<div class="controls">
 
-<button onclick="start()">Start</button>
+Error (%):
+<input type="range" id="errorSlider" min="0" max="1" step="0.1" value="0">
+<span id="errorValue">0</span>
+
+<br><br>
+
+<button onclick="generatePath()">Generate Path</button>
+<button onclick="startSimulation()">Start</button>
 <button onclick="reset()">Reset</button>
+
+</div>
 
 <script>
 
 const canvas=document.getElementById("canvas")
 const ctx=canvas.getContext("2d")
 
-const originX=350
-const originY=250
+const width=canvas.width
+const height=canvas.height
 
-let x=0
-let y=0
-let theta=0
+let start=null
+let goal=null
 
-let pathActual=[]
-let pathExpected=[]
+let robot={x:0,y:0,theta:0}
+
+let path=[]
+let actualPath=[]
+
+let obstacles=[]
 
 let running=false
 
-let dt=0.05
-let time=0
+let errorPercent=0
 
-function worldToCanvas(px,py){
+document.getElementById("errorSlider").oninput=function(){
 
-return{
-x:originX+px*50,
-y:originY-py*50
+errorPercent=parseFloat(this.value)/100
+document.getElementById("errorValue").innerText=this.value
+
+}
+
+canvas.addEventListener("click",function(e){
+
+let rect=canvas.getBoundingClientRect()
+
+let x=e.clientX-rect.left
+let y=e.clientY-rect.top
+
+if(!start){
+
+start={x,y}
+
+}
+
+else if(!goal){
+
+goal={x,y}
+
+}
+
+})
+
+function generateObstacles(){
+
+obstacles=[]
+
+for(let i=0;i<5;i++){
+
+obstacles.push({
+
+x:Math.random()*700+50,
+y:Math.random()*400+50,
+r:20+Math.random()*15
+
+})
+
 }
 
 }
 
-function trajectory(t){
+generateObstacles()
 
-if(t<5){
+function generatePath(){
 
-return {v:1, w:0}
+if(!start||!goal) return
 
-}
+path=[]
 
-else if(t<10){
+let midX=(start.x+goal.x)/2
+let midY=(start.y+goal.y)/2-80
 
-return {v:1, w:0.3}
+path.push(start)
+path.push({x:midX,y:midY})
+path.push(goal)
 
-}
-
-else if(t<15){
-
-return {v:1, w:0}
-
-}
-
-else{
-
-return {v:0,w:0}
+robot.x=start.x
+robot.y=start.y
 
 }
+
+function startSimulation(){
+
+running=true
 
 }
 
@@ -104,118 +149,170 @@ function update(){
 
 if(!running) return
 
-let cmd=trajectory(time)
+if(path.length<2) return
 
-let v=cmd.v
-let w=cmd.w
+let target=path[0]
 
-/* expected motion */
+let dx=target.x-robot.x
+let dy=target.y-robot.y
 
-let xe=0
-let ye=0
-let the=0
+let dist=Math.sqrt(dx*dx+dy*dy)
 
-if(pathExpected.length==0){
+if(dist<3){
 
-xe=0
-ye=0
-the=0
+path.shift()
 
-}else{
+if(path.length==0){
 
-xe=pathExpected[pathExpected.length-1].x
-ye=pathExpected[pathExpected.length-1].y
-the=pathExpected[pathExpected.length-1].theta
+running=false
+return
 
 }
 
-the+=w*dt
+target=path[0]
 
-xe+=v*Math.cos(the)*dt
-ye+=v*Math.sin(the)*dt
+}
 
-pathExpected.push({x:xe,y:ye,theta:the})
+let angle=Math.atan2(dy,dx)
 
-/* actual motion with error */
+robot.theta=angle
 
-let vError=v*0.95
+let speed=1.5
 
-theta+=w*dt
+let error=1-(Math.random()*errorPercent)
 
-x+=vError*Math.cos(theta)*dt
-y+=vError*Math.sin(theta)*dt
+robot.x+=speed*Math.cos(angle)*error
+robot.y+=speed*Math.sin(angle)*error
 
-pathActual.push({x,y})
-
-time+=dt
+actualPath.push({x:robot.x,y:robot.y})
 
 }
 
 function drawGrid(){
 
-ctx.strokeStyle="#e6e6e6"
+ctx.strokeStyle="#eee"
 
-for(let i=-10;i<10;i++){
-
-ctx.beginPath()
-ctx.moveTo(originX+i*50,0)
-ctx.lineTo(originX+i*50,500)
-ctx.stroke()
+for(let x=0;x<width;x+=40){
 
 ctx.beginPath()
-ctx.moveTo(0,originY+i*50)
-ctx.lineTo(700,originY+i*50)
+ctx.moveTo(x,0)
+ctx.lineTo(x,height)
 ctx.stroke()
 
 }
+
+for(let y=0;y<height;y+=40){
+
+ctx.beginPath()
+ctx.moveTo(0,y)
+ctx.lineTo(width,y)
+ctx.stroke()
+
+}
+
+}
+
+function drawObstacles(){
+
+ctx.fillStyle="#999"
+
+for(let o of obstacles){
+
+ctx.beginPath()
+ctx.arc(o.x,o.y,o.r,0,Math.PI*2)
+ctx.fill()
+
+}
+
+}
+
+function drawPoints(){
+
+if(start){
+
+ctx.fillStyle="green"
+ctx.beginPath()
+ctx.arc(start.x,start.y,8,0,Math.PI*2)
+ctx.fill()
+
+}
+
+if(goal){
+
+ctx.fillStyle="red"
+ctx.beginPath()
+ctx.arc(goal.x,goal.y,8,0,Math.PI*2)
+ctx.fill()
+
+}
+
+}
+
+function drawPath(){
+
+if(path.length<1) return
+
+ctx.strokeStyle="green"
+ctx.lineWidth=2
+ctx.beginPath()
+
+ctx.moveTo(start.x,start.y)
+
+for(let p of path){
+
+ctx.lineTo(p.x,p.y)
+
+}
+
+ctx.stroke()
+
+}
+
+function drawActualPath(){
+
+ctx.strokeStyle="red"
+ctx.beginPath()
+
+for(let p of actualPath){
+
+ctx.lineTo(p.x,p.y)
+
+}
+
+ctx.stroke()
+
+}
+
+function drawRobot(){
+
+ctx.save()
+
+ctx.translate(robot.x,robot.y)
+ctx.rotate(robot.theta)
+
+ctx.fillStyle="black"
+
+ctx.fillRect(-8,-6,16,12)
+
+ctx.restore()
 
 }
 
 function draw(){
 
-ctx.clearRect(0,0,700,500)
+ctx.clearRect(0,0,width,height)
 
 drawGrid()
 
-/* expected path */
+drawObstacles()
 
-ctx.strokeStyle="green"
-ctx.beginPath()
+drawPoints()
 
-for(let p of pathExpected){
+drawPath()
 
-let c=worldToCanvas(p.x,p.y)
+drawActualPath()
 
-ctx.lineTo(c.x,c.y)
-
-}
-
-ctx.stroke()
-
-/* actual path */
-
-ctx.strokeStyle="red"
-ctx.beginPath()
-
-for(let p of pathActual){
-
-let c=worldToCanvas(p.x,p.y)
-
-ctx.lineTo(c.x,c.y)
-
-}
-
-ctx.stroke()
-
-/* robot */
-
-let r=worldToCanvas(x,y)
-
-ctx.fillStyle="black"
-
-ctx.beginPath()
-ctx.arc(r.x,r.y,6,0,Math.PI*2)
-ctx.fill()
+drawRobot()
 
 }
 
@@ -230,24 +327,17 @@ requestAnimationFrame(loop)
 
 loop()
 
-function start(){
-
-running=true
-
-}
-
 function reset(){
+
+start=null
+goal=null
+
+path=[]
+actualPath=[]
 
 running=false
 
-time=0
-
-x=0
-y=0
-theta=0
-
-pathActual=[]
-pathExpected=[]
+generateObstacles()
 
 }
 
