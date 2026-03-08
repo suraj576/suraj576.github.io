@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Differential Drive Simulator</title>
+
+<style>
+body{
+    font-family: Arial;
+    text-align:center;
+}
+
+canvas{
+    border:1px solid black;
+}
+
+.controls{
+    margin-top:10px;
+}
+
+.info{
+    margin-top:10px;
+    font-size:16px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Differential Drive Robot Simulator</h2>
+
+<canvas id="simCanvas" width="700" height="500"></canvas>
+
+<div class="controls">
+
+Left Wheel Speed (rad/s)
+<input type="range" id="leftWheel" min="-10" max="10" step="0.1" value="2">
+<span id="leftVal">2</span>
+
+<br><br>
+
+Right Wheel Speed (rad/s)
+<input type="range" id="rightWheel" min="-10" max="10" step="0.1" value="2">
+<span id="rightVal">2</span>
+
+<br><br>
+
+<button onclick="resetSim()">Reset</button>
+
+</div>
+
+<div class="info">
+
+Simulation Time: <span id="time">0.0</span> s <br>
+Position: (<span id="xpos">0</span>, <span id="ypos">0</span>) <br>
+Orientation: <span id="theta">0</span> rad <br>
+Linear Velocity v: <span id="vval">0</span> m/s <br>
+Angular Velocity ω: <span id="wval">0</span> rad/s
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("simCanvas");
+const ctx = canvas.getContext("2d");
+
+let x = 350;
+let y = 250;
+let theta = 0;
+
+let time = 0;
+
+const dt = 0.1;
+
+const r = 10;
+const L = 40;
+
+let path=[];
+
+const leftSlider=document.getElementById("leftWheel");
+const rightSlider=document.getElementById("rightWheel");
+
+const leftVal=document.getElementById("leftVal");
+const rightVal=document.getElementById("rightVal");
+
+leftSlider.oninput=()=>leftVal.innerText=leftSlider.value;
+rightSlider.oninput=()=>rightVal.innerText=rightSlider.value;
+
+function resetSim(){
+
+    x=350;
+    y=250;
+    theta=0;
+    time=0;
+    path=[];
+}
+
+function update(){
+
+    let wl=parseFloat(leftSlider.value);
+    let wr=parseFloat(rightSlider.value);
+
+    let v = (r/2)*(wr+wl);
+    let omega = (r/L)*(wr-wl);
+
+    theta += omega*dt;
+
+    x += v*Math.cos(theta)*dt;
+    y += v*Math.sin(theta)*dt;
+
+    time += dt;
+
+    path.push({x:x,y:y});
+
+    document.getElementById("time").innerText=time.toFixed(1);
+    document.getElementById("xpos").innerText=(x-350).toFixed(2);
+    document.getElementById("ypos").innerText=(250-y).toFixed(2);
+    document.getElementById("theta").innerText=theta.toFixed(2);
+    document.getElementById("vval").innerText=v.toFixed(2);
+    document.getElementById("wval").innerText=omega.toFixed(2);
+}
+
+function draw(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    ctx.beginPath();
+    for(let i=0;i<path.length;i++){
+        ctx.lineTo(path[i].x,path[i].y);
+    }
+
+    ctx.strokeStyle="blue";
+    ctx.stroke();
+
+    ctx.save();
+
+    ctx.translate(x,y);
+    ctx.rotate(theta);
+
+    ctx.fillStyle="red";
+    ctx.fillRect(-15,-10,30,20);
+
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(20,0);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function loop(){
+
+    update();
+    draw();
+
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+</script>
+
+</body>
+</html>
