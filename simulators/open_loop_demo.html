@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>Open Loop Control Demonstration</title>
+<title>Open Loop Control Demo</title>
 
 <style>
 
@@ -28,7 +28,6 @@ margin-top:15px;
 }
 
 </style>
-
 </head>
 
 <body>
@@ -38,10 +37,10 @@ margin-top:15px;
 <div class="instructions">
 
 <b>Instructions</b><br>
-1. Click once to set <b>Start</b> (green)<br>
-2. Click again to set <b>Goal</b> (red)<br>
-3. Press <b>Plan Path</b><br>
-4. Press <b>Start Simulation</b>
+1. Click to select <b>Start</b> (green)<br>
+2. Click again to select <b>Goal</b> (red)<br>
+3. Click <b>Plan Path</b><br>
+4. Click <b>Start Simulation</b>
 
 </div>
 
@@ -51,7 +50,7 @@ margin-top:15px;
 
 Wheel Error (%)
 
-<input type="range" id="errorSlider" min="0" max="10" step="0.1" value="0">
+<input type="range" id="errorSlider" min="0" max="10" step="0.5" value="0">
 <span id="errorValue">0</span>
 
 <br><br>
@@ -74,11 +73,12 @@ let robot={x:0,y:0,theta:0}
 
 let plannedPath=[]
 let actualPath=[]
+
 let pathIndex=0
 
-let running=false
-
 let obstacles=[]
+
+let running=false
 
 let errorBias=0
 
@@ -147,6 +147,29 @@ return Math.sqrt(dx*dx+dy*dy)<o.r+10
 
 }
 
+function generateSmoothPath(points){
+
+let smooth=[]
+
+for(let i=0;i<points.length-1;i++){
+
+let p1=points[i]
+let p2=points[i+1]
+
+for(let t=0;t<=1;t+=0.02){
+
+let x=p1.x+(p2.x-p1.x)*t
+let y=p1.y+(p2.y-p1.y)*t
+
+smooth.push({x,y})
+
+}
+
+}
+
+return smooth
+}
+
 function planPath(){
 
 if(!start||!goal){
@@ -156,13 +179,9 @@ return
 
 }
 
-plannedPath=[]
-actualPath=[]
-pathIndex=0
+let waypoints=[]
 
-plannedPath.push(start)
-
-let detours=[]
+waypoints.push(start)
 
 for(let o of obstacles){
 
@@ -176,7 +195,7 @@ let len=Math.sqrt(dx*dx+dy*dy)
 let nx=-dy/len
 let ny=dx/len
 
-detours.push({
+waypoints.push({
 
 x:o.x+nx*(o.r+60),
 y:o.y+ny*(o.r+60)
@@ -187,26 +206,15 @@ y:o.y+ny*(o.r+60)
 
 }
 
-detours.sort((a,b)=>{
+waypoints.push(goal)
 
-let da=Math.hypot(a.x-start.x,a.y-start.y)
-let db=Math.hypot(b.x-start.x,b.y-start.y)
+plannedPath=generateSmoothPath(waypoints)
 
-return da-db
-
-})
-
-for(let p of detours){
-
-plannedPath.push(p)
-
-}
-
-plannedPath.push(goal)
+actualPath=[]
+pathIndex=0
 
 robot.x=start.x
 robot.y=start.y
-robot.theta=0
 
 }
 
@@ -227,47 +235,47 @@ function update(){
 
 if(!running) return
 
-if(pathIndex >= plannedPath.length-1){
-running = false
+if(pathIndex>=plannedPath.length){
+
+running=false
 return
+
 }
 
-let target = plannedPath[pathIndex+1]
+let target=plannedPath[pathIndex]
 
-let dx = target.x - robot.x
-let dy = target.y - robot.y
+let dx=target.x-robot.x
+let dy=target.y-robot.y
 
-let dist = Math.sqrt(dx*dx + dy*dy)
+let dist=Math.sqrt(dx*dx+dy*dy)
 
-let speed = 2
+let speed=2
 
-if(dist < speed){
+if(dist<speed){
 
-robot.x = target.x
-robot.y = target.y
+robot.x=target.x
+robot.y=target.y
 
 pathIndex++
-
 return
 
 }
 
-/* compute direction of motion */
+let angle=Math.atan2(dy,dx)
 
-let angle = Math.atan2(dy,dx)
+/* simulate actuator error */
 
-/* introduce heading error only when slider > 0 */
+angle+=errorBias*0.3
 
-angle += errorBias * 0.5
+robot.theta=angle
 
-robot.theta = angle
-
-robot.x += speed * Math.cos(angle)
-robot.y += speed * Math.sin(angle)
+robot.x+=speed*Math.cos(angle)
+robot.y+=speed*Math.sin(angle)
 
 actualPath.push({x:robot.x,y:robot.y})
 
 }
+
 function drawGrid(){
 
 ctx.strokeStyle="#eee"
@@ -328,40 +336,22 @@ ctx.fill()
 
 }
 
-
 function drawPlanned(){
 
-if(plannedPath.length < 2) return
+if(plannedPath.length<2) return
 
 ctx.strokeStyle="green"
 ctx.lineWidth=2
 
 ctx.beginPath()
 
-ctx.moveTo(plannedPath[0].x, plannedPath[0].y)
+ctx.moveTo(plannedPath[0].x,plannedPath[0].y)
 
-for(let i=1;i<plannedPath.length-1;i++){
+for(let p of plannedPath){
 
-let xc = (plannedPath[i].x + plannedPath[i+1].x)/2
-let yc = (plannedPath[i].y + plannedPath[i+1].y)/2
-
-ctx.quadraticCurveTo(
-    plannedPath[i].x,
-    plannedPath[i].y,
-    xc,
-    yc
-)
+ctx.lineTo(p.x,p.y)
 
 }
-
-let last = plannedPath.length-1
-
-ctx.quadraticCurveTo(
-plannedPath[last-1].x,
-plannedPath[last-1].y,
-plannedPath[last].x,
-plannedPath[last].y
-)
 
 ctx.stroke()
 
