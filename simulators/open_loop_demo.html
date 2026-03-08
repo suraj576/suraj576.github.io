@@ -4,7 +4,6 @@
 <title>Open Loop Control Demo</title>
 
 <style>
-
 body{
 font-family:system-ui;
 background:#f4f6f8;
@@ -17,15 +16,25 @@ border-radius:10px;
 box-shadow:0 4px 12px rgba(0,0,0,0.15);
 }
 
-.panel{
+.instructions{
+font-size:14px;
+margin-bottom:10px;
+}
+
+.controls{
 margin-top:10px;
 }
 
-.instructions{
-margin-bottom:10px;
-font-size:14px;
+progress{
+width:200px;
+height:16px;
 }
 
+.status{
+font-size:13px;
+margin-top:6px;
+color:#444;
+}
 </style>
 
 </head>
@@ -35,32 +44,33 @@ font-size:14px;
 <h2>Open Loop Control Demonstration</h2>
 
 <div class="instructions">
-
 <b>Instructions</b><br>
-1. Click anywhere to set the <b>start</b> position (green). <br>
-2. Click again to set the <b>goal</b> position (red). <br>
-3. Press <b>Plan Path</b>. <br>
-4. Press <b>Start Simulation</b>. <br>
-
-Green line = planned trajectory  
-Red line = actual robot motion
-
+1. Click once to set <b>Start</b> (green).<br>
+2. Click again to set <b>Goal</b> (red).<br>
+3. Click <b>Plan Path</b>.<br>
+4. Click <b>Start Simulation</b>.<br>
+Green = planned path, Red = actual robot path.
 </div>
 
 <canvas id="canvas" width="800" height="500"></canvas>
 
-<div class="panel">
+<div class="controls">
 
-Error (% wheel bias)
-
+Wheel Error (%)
 <input type="range" id="errorSlider" min="0" max="1" step="0.1" value="0">
 <span id="errorValue">0</span>
 
 <br><br>
 
-<button onclick="planPath()">Plan Path</button>
-<button onclick="startSimulation()">Start Simulation</button>
+<button id="planBtn">Plan Path</button>
+<button id="startBtn">Start Simulation</button>
 <button onclick="reset()">Reset</button>
+
+<br><br>
+
+<progress id="progress" value="0" max="100"></progress>
+
+<div class="status" id="statusText">Idle</div>
 
 </div>
 
@@ -82,36 +92,32 @@ let robot={x:0,y:0,theta:0}
 let plannedPath=[]
 let actualPath=[]
 
-let running=false
-
 let obstacles=[]
+
+let running=false
 
 let errorBias=0
 
-document.getElementById("errorSlider").oninput=function(){
+const progress=document.getElementById("progress")
+const statusText=document.getElementById("statusText")
 
+document.getElementById("errorSlider").oninput=function(){
 errorBias=parseFloat(this.value)/100
 document.getElementById("errorValue").innerText=this.value
-
 }
 
 canvas.onclick=function(e){
 
-let rect=canvas.getBoundingClientRect()
+const rect=canvas.getBoundingClientRect()
 
-let x=e.clientX-rect.left
-let y=e.clientY-rect.top
+const x=e.clientX-rect.left
+const y=e.clientY-rect.top
 
 if(!start){
-
 start={x,y}
-
 }
-
 else if(!goal){
-
 goal={x,y}
-
 }
 
 }
@@ -121,15 +127,11 @@ function generateObstacles(){
 obstacles=[]
 
 for(let i=0;i<6;i++){
-
 obstacles.push({
-
 x:100+Math.random()*600,
 y:80+Math.random()*340,
 r:30
-
 })
-
 }
 
 }
@@ -152,12 +154,17 @@ return false
 
 }
 
-function planPath(){
+document.getElementById("planBtn").onclick=planPath
+
+async function planPath(){
 
 if(!start||!goal){
-alert("Please select start and goal first")
+alert("Please click start and goal first.")
 return
 }
+
+statusText.innerText="Planning path..."
+progress.value=0
 
 plannedPath=[]
 
@@ -166,18 +173,30 @@ let rows=Math.floor(H/grid)
 
 function key(x,y){return x+","+y}
 
-let open=[{
+let queue=[{
 x:Math.floor(start.x/grid),
-y:Math.floor(start.y/grid),
-g:0
+y:Math.floor(start.y/grid)
 }]
 
 let came={}
 let visited={}
 
-while(open.length){
+let maxNodes=cols*rows
+let explored=0
 
-let current=open.shift()
+while(queue.length){
+
+let current=queue.shift()
+
+explored++
+
+if(explored%50===0){
+
+progress.value=Math.min(100,(explored/maxNodes)*100)
+
+await new Promise(r=>setTimeout(r,0))
+
+}
 
 let wx=current.x*grid
 let wy=current.y*grid
@@ -205,6 +224,8 @@ robot.x=start.x
 robot.y=start.y
 robot.theta=0
 
+statusText.innerText="Path found"
+
 return
 
 }
@@ -231,26 +252,25 @@ visited[k]=true
 
 came[k]=key(current.x,current.y)
 
-open.push({x:nx,y:ny})
+queue.push({x:nx,y:ny})
 
 }
 
 }
 
-alert("No path found")
+statusText.innerText="No path found"
 
 }
 
-function startSimulation(){
+document.getElementById("startBtn").onclick=function(){
 
 if(plannedPath.length<2){
-
-alert("Plan path first")
+alert("Plan a path first")
 return
-
 }
 
 running=true
+statusText.innerText="Simulation running"
 
 }
 
@@ -274,6 +294,7 @@ plannedPath.shift()
 if(plannedPath.length==0){
 
 running=false
+statusText.innerText="Goal reached"
 return
 
 }
@@ -300,21 +321,17 @@ function drawGrid(){
 ctx.strokeStyle="#eee"
 
 for(let x=0;x<W;x+=grid){
-
 ctx.beginPath()
 ctx.moveTo(x,0)
 ctx.lineTo(x,H)
 ctx.stroke()
-
 }
 
 for(let y=0;y<H;y+=grid){
-
 ctx.beginPath()
 ctx.moveTo(0,y)
 ctx.lineTo(W,y)
 ctx.stroke()
-
 }
 
 }
@@ -324,11 +341,9 @@ function drawObstacles(){
 ctx.fillStyle="#888"
 
 for(let o of obstacles){
-
 ctx.beginPath()
 ctx.arc(o.x,o.y,o.r,0,Math.PI*2)
 ctx.fill()
-
 }
 
 }
@@ -336,21 +351,17 @@ ctx.fill()
 function drawPoints(){
 
 if(start){
-
 ctx.fillStyle="green"
 ctx.beginPath()
 ctx.arc(start.x,start.y,8,0,Math.PI*2)
 ctx.fill()
-
 }
 
 if(goal){
-
 ctx.fillStyle="red"
 ctx.beginPath()
 ctx.arc(goal.x,goal.y,8,0,Math.PI*2)
 ctx.fill()
-
 }
 
 }
@@ -367,9 +378,7 @@ ctx.beginPath()
 ctx.moveTo(start.x,start.y)
 
 for(let p of plannedPath){
-
 ctx.lineTo(p.x,p.y)
-
 }
 
 ctx.stroke()
@@ -383,9 +392,7 @@ ctx.strokeStyle="red"
 ctx.beginPath()
 
 for(let p of actualPath){
-
 ctx.lineTo(p.x,p.y)
-
 }
 
 ctx.stroke()
@@ -441,6 +448,10 @@ actualPath=[]
 running=false
 
 generateObstacles()
+
+statusText.innerText="Reset"
+
+progress.value=0
 
 }
 
